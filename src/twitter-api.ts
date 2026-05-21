@@ -1,11 +1,16 @@
 import { TwitterApi } from 'twitter-api-v2';
 import { Config, TwitterError, Tweet, TwitterUser, PostedTweet } from './types.js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class TwitterClient {
   private client: TwitterApi;
   private rateLimitMap = new Map<string, number>();
 
+  private config: Config;
+
   constructor(config: Config) {
+    this.config = config;
     this.client = new TwitterApi({
       appKey: config.apiKey,
       appSecret: config.apiSecretKey,
@@ -37,6 +42,67 @@ export class TwitterClient {
     } catch (error) {
       this.handleApiError(error);
     }
+  }
+
+  async postTweetWithImage(text: string, imagePath: string, replyToTweetId?: string): Promise<PostedTweet> {
+    try {
+      const endpoint = 'tweets/create';
+      await this.checkRateLimit(endpoint);
+
+      if (!fs.existsSync(imagePath)) {
+        throw new TwitterError(
+          `Image file not found: ${imagePath}`,
+          'file_not_found',
+          404
+        );
+      }
+
+      const mediaId = await this.uploadMedia(imagePath);
+
+      const tweetOptions: any = { text };
+      tweetOptions.media = { media_ids: [mediaId] };
+      if (replyToTweetId) {
+        tweetOptions.reply = { in_reply_to_tweet_id: replyToTweetId };
+      }
+
+      const response = await this.client.v2.tweet(tweetOptions);
+
+      console.error(`Tweet with image posted successfully with ID: ${response.data.id}`);
+
+      return {
+        id: response.data.id,
+        text: response.data.text
+      };
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  private async uploadMedia(filePath: string): Promise<string> {
+    const data = fs.readFileSync(filePath);
+    const mimeType = this.getMimeType(filePath);
+    const mediaId = await this.client.v1.uploadMedia(data, { mimeType });
+    return mediaId;
+  }
+
+  private getMimeType(filePath: string): string {
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp'
+    };
+    const mimeType = mimeTypes[ext];
+    if (!mimeType) {
+      throw new TwitterError(
+        `Unsupported image format: ${ext}. Supported formats: JPG, JPEG, PNG, GIF, WEBP`,
+        'unsupported_format',
+        400
+      );
+    }
+    return mimeType;
   }
 
   async searchTweets(query: string, count: number): Promise<{ tweets: Tweet[], users: TwitterUser[] }> {

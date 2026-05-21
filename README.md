@@ -38,16 +38,30 @@ This MCP server allows Clients to interact with Twitter, enabling posting tweets
 
 3. Restart Claude Desktop
 
-That's it! Claude can now interact with Twitter through two tools:
+That's it! Claude can now interact with Twitter through three tools:
 
 - `post_tweet`: Post a new tweet
+- `post_tweet_with_image`: Post a tweet with an image (supports JPG, JPEG, PNG, GIF, WEBP)
 - `search_tweets`: Search for tweets
 
 ## Example Usage
 
 Try asking Claude:
 - "Can you post a tweet saying 'Hello from Claude!'"
+- "Post a tweet with the image at /path/to/image.png saying 'Check this out!'"
 - "Can you search for tweets about Claude AI?"
+
+### Posting a Tweet with an Image
+
+The `post_tweet_with_image` tool accepts:
+- `text` (required): The tweet content (max 280 characters)
+- `image_path` (required): Local file path to the image
+- `reply_to_tweet_id` (optional): Tweet ID to reply to
+
+Supported image formats: **JPG, JPEG, PNG, GIF, WEBP**
+
+
+**Important:** If you want to provide an image using a file path, the **File System MCP server** must be added to your MCP client, and the image must be in a folder that the server has access to. For example, if you have granted the Filesystem MCP Server access to your Desktop folder, you can say: *"Take the image myimage.png from my desktop and post it with the caption 'Hello world!'"*
 
 ## Troubleshooting
 

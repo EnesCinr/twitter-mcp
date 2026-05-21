@@ -29,6 +29,16 @@ export const SearchTweetsSchema = z.object({
 export type PostTweetArgs = z.infer<typeof PostTweetSchema>;
 export type SearchTweetsArgs = z.infer<typeof SearchTweetsSchema>;
 
+export const PostTweetWithImageSchema = z.object({
+    text: z.string()
+        .min(1, 'Tweet text cannot be empty')
+        .max(280, 'Tweet cannot exceed 280 characters'),
+    image_path: z.string().min(1, 'Image path is required'),
+    reply_to_tweet_id: z.string().optional()
+});
+
+export type PostTweetWithImageArgs = z.infer<typeof PostTweetWithImageSchema>;
+
 // API Response types
 export interface TweetMetrics {
     likes: number;

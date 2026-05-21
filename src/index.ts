@@ -13,7 +13,7 @@ import { TwitterClient } from './twitter-api.js';
 import { ResponseFormatter } from './formatter.js';
 import {
   Config, ConfigSchema,
-  PostTweetSchema, SearchTweetsSchema,
+  PostTweetSchema, PostTweetWithImageSchema, SearchTweetsSchema,
   TwitterError
 } from './types.js';
 import dotenv from 'dotenv';
@@ -83,6 +83,29 @@ export class TwitterServer {
           }
         } as Tool,
         {
+          name: 'post_tweet_with_image',
+          description: 'Post a tweet with an image to Twitter',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              text: {
+                type: 'string',
+                description: 'The content of your tweet',
+                maxLength: 280
+              },
+              image_path: {
+                type: 'string',
+                description: 'Local file path to the image (supports JPG, JPEG, PNG, GIF, WEBP)'
+              },
+              reply_to_tweet_id: {
+                type: 'string',
+                description: 'Optional: ID of the tweet to reply to'
+              }
+            },
+            required: ['text', 'image_path']
+          }
+        } as Tool,
+        {
           name: 'search_tweets',
           description: 'Search for tweets on Twitter',
           inputSchema: {
@@ -114,6 +137,8 @@ export class TwitterServer {
         switch (name) {
           case 'post_tweet':
             return await this.handlePostTweet(args);
+          case 'post_tweet_with_image':
+            return await this.handlePostTweetWithImage(args);
           case 'search_tweets':
             return await this.handleSearchTweets(args);
           default:
@@ -142,6 +167,28 @@ export class TwitterServer {
       content: [{
         type: 'text',
         text: `Tweet posted successfully!\nURL: https://twitter.com/status/${tweet.id}`
+      }] as TextContent[]
+    };
+  }
+
+  private async handlePostTweetWithImage(args: unknown) {
+    const result = PostTweetWithImageSchema.safeParse(args);
+    if (!result.success) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Invalid parameters: ${result.error.message}`
+      );
+    }
+
+    const tweet = await this.client.postTweetWithImage(
+      result.data.text,
+      result.data.image_path,
+      result.data.reply_to_tweet_id
+    );
+    return {
+      content: [{
+        type: 'text',
+        text: `Tweet with image posted successfully!\nURL: https://twitter.com/status/${tweet.id}`
       }] as TextContent[]
     };
   }
