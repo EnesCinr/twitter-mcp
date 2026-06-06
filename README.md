@@ -29,12 +29,18 @@ This MCP server allows Clients to interact with Twitter, enabling posting tweets
         "API_KEY": "your_api_key_here",
         "API_SECRET_KEY": "your_api_secret_key_here",
         "ACCESS_TOKEN": "your_access_token_here",
-        "ACCESS_TOKEN_SECRET": "your_access_token_secret_here"
+        "ACCESS_TOKEN_SECRET": "your_access_token_secret_here",
+        "HERMES_TWEET_API_KEY": "optional_hermes_tweet_key"
       }
     }
   }
 }
 ```
+
+`HERMES_TWEET_API_KEY` is optional. When set, `search_tweets` uses Hermes Tweet
+for X/Twitter search results while `post_tweet` keeps using the configured
+Twitter API credentials. Set `HERMES_TWEET_BASE_URL` only if you need a custom
+Hermes Tweet API base URL.
 
 3. Restart Claude Desktop
 

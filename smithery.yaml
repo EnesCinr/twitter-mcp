@@ -23,7 +23,13 @@ startCommand:
       accessTokenSecret:
         type: string
         description: Twitter access token secret.
+      hermesTweetApiKey:
+        type: string
+        description: Optional Hermes Tweet API key. When set, search_tweets uses Hermes Tweet while post_tweet keeps using Twitter credentials.
+      hermesTweetBaseUrl:
+        type: string
+        description: Optional Hermes Tweet API base URL. Defaults to https://api.xquik.com.
   commandFunction:
     # A function that produces the CLI command to start the MCP on stdio.
     |-
-    config => ({command: 'node', args: ['build/index.js'], env: {API_KEY: config.apiKey, API_SECRET_KEY: config.apiSecretKey, ACCESS_TOKEN: config.accessToken, ACCESS_TOKEN_SECRET: config.accessTokenSecret}})
+    config => ({command: 'node', args: ['build/index.js'], env: {API_KEY: config.apiKey, API_SECRET_KEY: config.apiSecretKey, ACCESS_TOKEN: config.accessToken, ACCESS_TOKEN_SECRET: config.accessTokenSecret, HERMES_TWEET_API_KEY: config.hermesTweetApiKey, HERMES_TWEET_BASE_URL: config.hermesTweetBaseUrl}})
