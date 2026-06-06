@@ -220,7 +220,9 @@ const config = {
   apiKey: process.env.API_KEY!,
   apiSecretKey: process.env.API_SECRET_KEY!,
   accessToken: process.env.ACCESS_TOKEN!,
-  accessTokenSecret: process.env.ACCESS_TOKEN_SECRET!
+  accessTokenSecret: process.env.ACCESS_TOKEN_SECRET!,
+  hermesTweetApiKey: process.env.HERMES_TWEET_API_KEY || process.env.XQUIK_API_KEY,
+  hermesTweetBaseUrl: process.env.HERMES_TWEET_BASE_URL || process.env.XQUIK_BASE_URL
 };
 
 const server = new TwitterServer(config);

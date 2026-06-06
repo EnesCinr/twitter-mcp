@@ -1,8 +1,10 @@
 import { TwitterApi } from 'twitter-api-v2';
+import { HermesTweetClient } from './hermes-tweet.js';
 import { Config, TwitterError, Tweet, TwitterUser, PostedTweet } from './types.js';
 
 export class TwitterClient {
   private client: TwitterApi;
+  private hermesTweetClient: HermesTweetClient;
   private rateLimitMap = new Map<string, number>();
 
   constructor(config: Config) {
@@ -11,6 +13,10 @@ export class TwitterClient {
       appSecret: config.apiSecretKey,
       accessToken: config.accessToken,
       accessSecret: config.accessTokenSecret,
+    });
+    this.hermesTweetClient = new HermesTweetClient({
+      apiKey: config.hermesTweetApiKey,
+      baseUrl: config.hermesTweetBaseUrl
     });
 
     console.error('Twitter API client initialized');
@@ -43,6 +49,10 @@ export class TwitterClient {
     try {
       const endpoint = 'tweets/search';
       await this.checkRateLimit(endpoint);
+
+      if (this.hermesTweetClient.isConfigured()) {
+        return await this.hermesTweetClient.searchTweets(query, count);
+      }
 
       const response = await this.client.v2.search(query, {
         max_results: count,
