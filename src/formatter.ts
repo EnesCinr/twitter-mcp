@@ -1,15 +1,18 @@
 import { FormattedTweet, Tweet, TwitterUser, SearchResponse } from './types.js';
 
 export class ResponseFormatter {
-  static formatTweet(tweet: Tweet, user: TwitterUser, position: number): FormattedTweet {
+  static formatTweet(tweet: Tweet, user: TwitterUser | undefined, position: number): FormattedTweet {
+    const username = user?.username ?? 'unknown';
     return {
       position,
       author: {
-        username: user.username
+        username
       },
       content: tweet.text,
       metrics: tweet.metrics,
-      url: `https://twitter.com/${user.username}/status/${tweet.id}`
+      url: user
+        ? `https://twitter.com/${username}/status/${tweet.id}`
+        : `https://twitter.com/i/web/status/${tweet.id}`
     };
   }
 
@@ -21,13 +24,11 @@ export class ResponseFormatter {
     const userMap = new Map(users.map(user => [user.id, user]));
     
     const formattedTweets = tweets
-      .map((tweet, index) => {
-        const user = userMap.get(tweet.authorId);
-        if (!user) return null;
-        
-        return this.formatTweet(tweet, user, index + 1);
-      })
-      .filter((tweet): tweet is FormattedTweet => tweet !== null);
+      .map((tweet, index) => this.formatTweet(
+        tweet,
+        userMap.get(tweet.authorId),
+        index + 1
+      ));
 
     return {
       query,

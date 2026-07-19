@@ -4,7 +4,7 @@
 
 [![smithery badge](https://smithery.ai/badge/@enescinar/twitter-mcp)](https://smithery.ai/server/@enescinar/twitter-mcp)
 
-This MCP server allows Clients to interact with Twitter, enabling posting tweets and searching Twitter.
+This MCP server lets clients search, read, and post on X.
 
 <a href="https://glama.ai/mcp/servers/dhsudtc7cd">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/dhsudtc7cd/badge" alt="Twitter Server MCP server" />
@@ -12,12 +12,37 @@ This MCP server allows Clients to interact with Twitter, enabling posting tweets
 
 ## Quick Start
 
-1. Create a Twitter Developer account and get your API keys from [Twitter Developer Portal](https://developer.twitter.com/en/portal/dashboard)
+Choose the credentials that match the tools you need:
 
-2. Add this configuration to your Claude Desktop config file:
+- For search and read tools, create an API key at [Xquik](https://xquik.com).
+- For posting and search, create credentials in the [Twitter Developer Portal](https://developer.twitter.com/en/portal/dashboard).
+- Configure both to use Xquik for reads and Twitter API v2 for posts.
+
+Add the server to your Claude Desktop configuration:
 
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`  
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+### Xquik read tools
+
+This integration uses Xquik only for read operations.
+Xquik is an independent third-party service. Not affiliated with X Corp.
+
+```json
+{
+  "mcpServers": {
+    "twitter-mcp": {
+      "command": "npx",
+      "args": ["-y", "@enescinar/twitter-mcp"],
+      "env": {
+        "XQUIK_API_KEY": "xq_your_key"
+      }
+    }
+  }
+}
+```
+
+### Twitter API v2 posting
 
 ```json
 {
@@ -36,18 +61,22 @@ This MCP server allows Clients to interact with Twitter, enabling posting tweets
 }
 ```
 
-3. Restart Claude Desktop
+Restart Claude Desktop after saving the configuration.
 
-That's it! Claude can now interact with Twitter through two tools:
+Available tools depend on the configured credentials:
 
-- `post_tweet`: Post a new tweet
-- `search_tweets`: Search for tweets
+- `search_tweets`: Search for posts with either backend
+- `get_tweet`: Read a post with Xquik
+- `get_user`: Read a user profile with Xquik
+- `get_trends`: Read regional trends with Xquik
+- `post_tweet`: Post with Twitter API v2 credentials
 
 ## Example Usage
 
 Try asking Claude:
 - "Can you post a tweet saying 'Hello from Claude!'"
 - "Can you search for tweets about Claude AI?"
+- "What is trending globally?"
 
 ## Troubleshooting
 
