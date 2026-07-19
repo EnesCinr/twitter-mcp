@@ -10,17 +10,26 @@ import {
   TextContent
 } from '@modelcontextprotocol/sdk/types.js';
 import { TwitterClient } from './twitter-api.js';
+import { XquikClient } from './xquik-api.js';
+import {
+  formatXquikTrends,
+  formatXquikTweet,
+  formatXquikUser,
+  XQUIK_TOOLS
+} from './xquik-tools.js';
 import { ResponseFormatter } from './formatter.js';
 import {
   Config, ConfigSchema,
   PostTweetSchema, SearchTweetsSchema,
+  GetTweetSchema, GetUserSchema, GetTrendsSchema,
   TwitterError
 } from './types.js';
 import dotenv from 'dotenv';
 
 export class TwitterServer {
   private server: Server;
-  private client: TwitterClient;
+  private client: TwitterClient | null;
+  private xquik: XquikClient | null;
 
   constructor(config: Config) {
     // Validate config
@@ -29,7 +38,24 @@ export class TwitterServer {
       throw new Error(`Invalid configuration: ${result.error.message}`);
     }
 
-    this.client = new TwitterClient(config);
+    // Initialize Xquik client if API key is available
+    this.xquik = config.xquikApiKey
+      ? new XquikClient(config.xquikApiKey)
+      : null;
+
+    // Initialize Twitter API v2 client if credentials are available
+    this.client = (config.apiKey && config.apiSecretKey && config.accessToken && config.accessTokenSecret)
+      ? new TwitterClient(config)
+      : null;
+
+    if (!this.xquik && !this.client) {
+      throw new Error(
+        'Either XQUIK_API_KEY or all four Twitter API credentials are required. '
+        + 'Get an Xquik key at https://xquik.com or '
+        + 'set API_KEY, API_SECRET_KEY, ACCESS_TOKEN, ACCESS_TOKEN_SECRET from the Twitter Developer Portal.'
+      );
+    }
+
     this.server = new Server({
       name: 'twitter-mcp',
       version: '1.0.0'
@@ -90,7 +116,7 @@ export class TwitterServer {
             properties: {
               query: {
                 type: 'string',
-                description: 'Search query'
+                description: 'Search query (supports from:user, #hashtag, "exact phrase")'
               },
               count: {
                 type: 'number',
@@ -101,7 +127,8 @@ export class TwitterServer {
             },
             required: ['query', 'count']
           }
-        } as Tool
+        } as Tool,
+        ...(this.xquik ? XQUIK_TOOLS : [])
       ]
     }));
 
@@ -116,6 +143,12 @@ export class TwitterServer {
             return await this.handlePostTweet(args);
           case 'search_tweets':
             return await this.handleSearchTweets(args);
+          case 'get_tweet':
+            return await this.handleGetTweet(args);
+          case 'get_user':
+            return await this.handleGetUser(args);
+          case 'get_trends':
+            return await this.handleGetTrends(args);
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -129,6 +162,13 @@ export class TwitterServer {
   }
 
   private async handlePostTweet(args: unknown) {
+    if (!this.client) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Posting requires Twitter API v2 credentials (API_KEY, API_SECRET_KEY, ACCESS_TOKEN, ACCESS_TOKEN_SECRET). This server uses Xquik only for read operations.'
+      );
+    }
+
     const result = PostTweetSchema.safeParse(args);
     if (!result.success) {
       throw new McpError(
@@ -155,7 +195,9 @@ export class TwitterServer {
       );
     }
 
-    const { tweets, users } = await this.client.searchTweets(
+    // Prefer the configured Xquik read backend when available
+    const searchClient = this.xquik || this.client!;
+    const { tweets, users } = await searchClient.searchTweets(
       result.data.query,
       result.data.count
     );
@@ -174,6 +216,61 @@ export class TwitterServer {
     };
   }
 
+  private async handleGetTweet(args: unknown) {
+    if (!this.xquik) {
+      throw new McpError(ErrorCode.InvalidParams, 'get_tweet requires XQUIK_API_KEY');
+    }
+    const result = GetTweetSchema.safeParse(args);
+    if (!result.success) {
+      throw new McpError(ErrorCode.InvalidParams, `Invalid parameters: ${result.error.message}`);
+    }
+
+    const { tweet, user } = await this.xquik.getTweet(result.data.tweet_id);
+    return {
+      content: [{
+        type: 'text',
+        text: formatXquikTweet(tweet, user)
+      }] as TextContent[]
+    };
+  }
+
+  private async handleGetUser(args: unknown) {
+    if (!this.xquik) {
+      throw new McpError(ErrorCode.InvalidParams, 'get_user requires XQUIK_API_KEY');
+    }
+    const result = GetUserSchema.safeParse(args);
+    if (!result.success) {
+      throw new McpError(ErrorCode.InvalidParams, `Invalid parameters: ${result.error.message}`);
+    }
+
+    const user = await this.xquik.getUser(result.data.username);
+    return {
+      content: [{
+        type: 'text',
+        text: formatXquikUser(user)
+      }] as TextContent[]
+    };
+  }
+
+  private async handleGetTrends(args: unknown) {
+    if (!this.xquik) {
+      throw new McpError(ErrorCode.InvalidParams, 'get_trends requires XQUIK_API_KEY');
+    }
+    const result = GetTrendsSchema.safeParse(args);
+    if (!result.success) {
+      throw new McpError(ErrorCode.InvalidParams, `Invalid parameters: ${result.error.message}`);
+    }
+
+    const trends = await this.xquik.getTrends(result.data.woeid, result.data.count);
+
+    return {
+      content: [{
+        type: 'text',
+        text: formatXquikTrends(trends)
+      }] as TextContent[]
+    };
+  }
+
   private handleError(error: unknown) {
     if (error instanceof McpError) {
       throw error;
@@ -184,18 +281,18 @@ export class TwitterServer {
         return {
           content: [{
             type: 'text',
-            text: 'Rate limit exceeded. Please wait a moment before trying again.',
-            isError: true
-          }] as TextContent[]
+            text: 'Rate limit exceeded. Please wait a moment before trying again.'
+          }] as TextContent[],
+          isError: true
         };
       }
 
       return {
         content: [{
           type: 'text',
-          text: `Twitter API error: ${(error as TwitterError).message}`,
-          isError: true
-        }] as TextContent[]
+          text: `Twitter API error: ${error.message}`
+        }] as TextContent[],
+        isError: true
       };
     }
 
@@ -217,10 +314,11 @@ export class TwitterServer {
 dotenv.config();
 
 const config = {
-  apiKey: process.env.API_KEY!,
-  apiSecretKey: process.env.API_SECRET_KEY!,
-  accessToken: process.env.ACCESS_TOKEN!,
-  accessTokenSecret: process.env.ACCESS_TOKEN_SECRET!
+  apiKey: process.env.API_KEY || '',
+  apiSecretKey: process.env.API_SECRET_KEY || '',
+  accessToken: process.env.ACCESS_TOKEN || '',
+  accessTokenSecret: process.env.ACCESS_TOKEN_SECRET || '',
+  xquikApiKey: process.env.XQUIK_API_KEY || ''
 };
 
 const server = new TwitterServer(config);

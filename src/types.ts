@@ -1,11 +1,13 @@
 import { z } from 'zod';
 
 // Configuration schema with validation
+// Twitter API v2 keys are optional when using Xquik for read operations
 export const ConfigSchema = z.object({
-    apiKey: z.string().min(1, 'API Key is required'),
-    apiSecretKey: z.string().min(1, 'API Secret Key is required'),
-    accessToken: z.string().min(1, 'Access Token is required'),
-    accessTokenSecret: z.string().min(1, 'Access Token Secret is required')
+    apiKey: z.string().default(''),
+    apiSecretKey: z.string().default(''),
+    accessToken: z.string().default(''),
+    accessTokenSecret: z.string().default(''),
+    xquikApiKey: z.string().default('')
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -26,6 +28,19 @@ export const SearchTweetsSchema = z.object({
         .max(100, 'Maximum count is 100')
 });
 
+export const GetTweetSchema = z.object({
+    tweet_id: z.string().min(1, 'Tweet ID cannot be empty')
+});
+
+export const GetUserSchema = z.object({
+    username: z.string().min(1, 'Username cannot be empty')
+});
+
+export const GetTrendsSchema = z.object({
+    woeid: z.number().int().default(1),
+    count: z.number().int().min(1).max(50).default(20)
+});
+
 export type PostTweetArgs = z.infer<typeof PostTweetSchema>;
 export type SearchTweetsArgs = z.infer<typeof SearchTweetsSchema>;
 
@@ -33,6 +48,8 @@ export type SearchTweetsArgs = z.infer<typeof SearchTweetsSchema>;
 export interface TweetMetrics {
     likes: number;
     retweets: number;
+    replies?: number;
+    quotes?: number;
 }
 
 export interface PostedTweet {
@@ -51,6 +68,8 @@ export interface Tweet {
 export interface TwitterUser {
     id: string;
     username: string;
+    name?: string;
+    verified?: boolean;
 }
 
 // Error types
@@ -64,7 +83,7 @@ export class TwitterError extends Error {
         this.name = 'TwitterError';
     }
 
-    static isRateLimit(error: unknown): error is TwitterError {
+    static isRateLimit(error: unknown): boolean {
         return error instanceof TwitterError && error.code === 'rate_limit_exceeded';
     }
 }

@@ -1,5 +1,22 @@
 import { TwitterApi } from 'twitter-api-v2';
+import type { SendTweetV2Params } from 'twitter-api-v2';
 import { Config, TwitterError, Tweet, TwitterUser, PostedTweet } from './types.js';
+
+interface IncludedUser {
+  id: string;
+  username: string;
+  name: string;
+  verified?: boolean;
+}
+
+export function mapIncludedUsers(users: IncludedUser[] | undefined): TwitterUser[] {
+  return (users ?? []).map(user => ({
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    verified: user.verified ?? false
+  }));
+}
 
 export class TwitterClient {
   private client: TwitterApi;
@@ -21,7 +38,7 @@ export class TwitterClient {
       const endpoint = 'tweets/create';
       await this.checkRateLimit(endpoint);
 
-      const tweetOptions: any = { text };
+      const tweetOptions: SendTweetV2Params = { text };
       if (replyToTweetId) {
         tweetOptions.reply = { in_reply_to_tweet_id: replyToTweetId };
       }
@@ -66,12 +83,7 @@ export class TwitterClient {
         createdAt: tweet.created_at ?? ''
       }));
 
-      const users = response.includes.users.map(user => ({
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        verified: user.verified ?? false
-      }));
+      const users = mapIncludedUsers(response.includes?.users);
 
       return { tweets, users };
     } catch (error) {
@@ -100,12 +112,18 @@ export class TwitterClient {
     }
 
     // Handle twitter-api-v2 errors
-    const apiError = error as any;
-    if (apiError.code) {
+    if (
+      typeof error === 'object'
+      && error !== null
+      && 'code' in error
+    ) {
+      const apiError = error as Record<string, unknown>;
       throw new TwitterError(
-        apiError.message || 'Twitter API error',
-        apiError.code,
-        apiError.status
+        typeof apiError.message === 'string'
+          ? apiError.message
+          : 'Twitter API error',
+        String(apiError.code),
+        typeof apiError.status === 'number' ? apiError.status : undefined
       );
     }
 
