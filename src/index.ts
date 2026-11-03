@@ -182,19 +182,19 @@ export class TwitterServer {
     if (error instanceof TwitterError) {
       if (TwitterError.isRateLimit(error)) {
         return {
+          isError: true,
           content: [{
             type: 'text',
-            text: 'Rate limit exceeded. Please wait a moment before trying again.',
-            isError: true
+            text: 'Rate limit exceeded. Please wait a moment before trying again.'
           }] as TextContent[]
         };
       }
 
       return {
+        isError: true,
         content: [{
           type: 'text',
-          text: `Twitter API error: ${(error as TwitterError).message}`,
-          isError: true
+          text: `Twitter API error: ${(error as TwitterError).message}`
         }] as TextContent[]
       };
     }
