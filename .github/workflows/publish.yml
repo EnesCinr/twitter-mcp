@@ -22,6 +22,8 @@ jobs:
       - name: Update npm for trusted publishing
         run: npm install -g npm@^11.5.1
       - name: Install dependencies and build 🔧
-        run: npm ci
+        run: |
+          npm ci
+          npm run build
       - name: Publish package on NPM 📦
         run: npm publish
