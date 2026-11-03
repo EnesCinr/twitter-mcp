@@ -40,13 +40,14 @@ This MCP server allows Clients to interact with Twitter, enabling posting tweets
 
 That's it! Claude can now interact with Twitter through two tools:
 
-- `post_tweet`: Post a new tweet
+- `post_tweet`: Post a new tweet, optionally as a reply (`reply_to_tweet_id`) or with up to 4 images (`media_paths`: local JPG, PNG, GIF or WEBP files)
 - `search_tweets`: Search for tweets
 
 ## Example Usage
 
 Try asking Claude:
 - "Can you post a tweet saying 'Hello from Claude!'"
+- "Can you post a tweet saying 'New logo!' with the image /Users/me/Pictures/logo.png"
 - "Can you search for tweets about Claude AI?"
 
 ## Troubleshooting

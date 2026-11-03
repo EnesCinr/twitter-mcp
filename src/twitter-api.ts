@@ -1,5 +1,15 @@
 import { TwitterApi } from 'twitter-api-v2';
+import { access } from 'fs/promises';
+import { extname } from 'path';
 import { Config, TwitterError, Tweet, TwitterUser, PostedTweet } from './types.js';
+
+const IMAGE_MIME_TYPES: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp'
+};
 
 export class TwitterClient {
   private client: TwitterApi;
@@ -16,7 +26,7 @@ export class TwitterClient {
     console.error('Twitter API client initialized');
   }
 
-  async postTweet(text: string, replyToTweetId?: string): Promise<PostedTweet> {
+  async postTweet(text: string, replyToTweetId?: string, mediaPaths: string[] = []): Promise<PostedTweet> {
     try {
       const endpoint = 'tweets/create';
       await this.checkRateLimit(endpoint);
@@ -24,6 +34,9 @@ export class TwitterClient {
       const tweetOptions: any = { text };
       if (replyToTweetId) {
         tweetOptions.reply = { in_reply_to_tweet_id: replyToTweetId };
+      }
+      if (mediaPaths.length > 0) {
+        tweetOptions.media = { media_ids: await this.uploadImages(mediaPaths) };
       }
 
       const response = await this.client.v2.tweet(tweetOptions);
@@ -77,6 +90,33 @@ export class TwitterClient {
     } catch (error) {
       this.handleApiError(error);
     }
+  }
+
+  private async uploadImages(paths: string[]): Promise<string[]> {
+    // Validate every file before uploading so a bad path doesn't leave orphaned uploads
+    const files = await Promise.all(paths.map(async (path) => {
+      const mimeType = IMAGE_MIME_TYPES[extname(path).toLowerCase()];
+      if (!mimeType) {
+        throw new TwitterError(
+          `Unsupported image type: ${path}. Supported types are JPG, PNG, GIF and WEBP`,
+          'invalid_media',
+          400
+        );
+      }
+      try {
+        await access(path);
+      } catch {
+        throw new TwitterError(`Image file not found: ${path}`, 'invalid_media', 400);
+      }
+      return { path, mimeType };
+    }));
+
+    const mediaIds: string[] = [];
+    for (const { path, mimeType } of files) {
+      mediaIds.push(await this.client.v1.uploadMedia(path, { mimeType }));
+    }
+    console.error(`Uploaded ${mediaIds.length} image(s): ${mediaIds.join(', ')}`);
+    return mediaIds;
   }
 
   private async checkRateLimit(endpoint: string): Promise<void> {
