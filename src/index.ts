@@ -65,7 +65,7 @@ export class TwitterServer {
       tools: [
         {
           name: 'post_tweet',
-          description: 'Post a new tweet to Twitter',
+          description: 'Post a new tweet to Twitter, optionally with up to 4 images',
           inputSchema: {
             type: 'object',
             properties: {
@@ -77,6 +77,12 @@ export class TwitterServer {
               reply_to_tweet_id: {
                 type: 'string',
                 description: 'Optional: ID of the tweet to reply to'
+              },
+              media_paths: {
+                type: 'array',
+                description: 'Optional: local file paths of images to attach (JPG, PNG, GIF or WEBP)',
+                items: { type: 'string' },
+                maxItems: 4
               }
             },
             required: ['text']
@@ -164,7 +170,11 @@ export class TwitterServer {
       );
     }
 
-    const tweet = await this.client.postTweet(result.data.text, result.data.reply_to_tweet_id);
+    const tweet = await this.client.postTweet(
+      result.data.text,
+      result.data.reply_to_tweet_id,
+      result.data.media_paths
+    );
     return {
       content: [{
         type: 'text',
@@ -243,6 +253,16 @@ export class TwitterServer {
           content: [{
             type: 'text',
             text: 'Rate limit exceeded. Please wait a moment before trying again.'
+          }] as TextContent[]
+        };
+      }
+
+      if ((error as TwitterError).code === 'invalid_media') {
+        return {
+          isError: true,
+          content: [{
+            type: 'text',
+            text: (error as TwitterError).message
           }] as TextContent[]
         };
       }
