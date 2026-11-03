@@ -26,8 +26,27 @@ export const SearchTweetsSchema = z.object({
         .max(100, 'Maximum count is 100')
 });
 
+export const GetHomeTimelineSchema = z.object({
+    count: z.number()
+        .int('Count must be an integer')
+        .min(1, 'Minimum count is 1')
+        .max(100, 'Maximum count is 100')
+        .optional(),
+    since_days: z.number()
+        .positive('since_days must be greater than 0')
+        .max(30, 'Maximum since_days is 30')
+        .optional(),
+    start_time: z.string()
+        .datetime({ message: 'start_time must be an ISO 8601 UTC timestamp, e.g. 2024-01-01T00:00:00Z' })
+        .optional()
+}).refine(
+    args => !(args.since_days !== undefined && args.start_time !== undefined),
+    { message: 'Provide either since_days or start_time, not both' }
+);
+
 export type PostTweetArgs = z.infer<typeof PostTweetSchema>;
 export type SearchTweetsArgs = z.infer<typeof SearchTweetsSchema>;
+export type GetHomeTimelineArgs = z.infer<typeof GetHomeTimelineSchema>;
 
 // API Response types
 export interface TweetMetrics {
@@ -77,11 +96,18 @@ export interface FormattedTweet {
     };
     content: string;
     metrics: TweetMetrics;
+    createdAt: string;
     url: string;
 }
 
 export interface SearchResponse {
     query: string;
+    count: number;
+    tweets: FormattedTweet[];
+}
+
+export interface TimelineResponse {
+    startTime?: string;
     count: number;
     tweets: FormattedTweet[];
 }

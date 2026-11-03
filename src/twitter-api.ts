@@ -1,4 +1,4 @@
-import { TwitterApi } from 'twitter-api-v2';
+import { TwitterApi, TweetV2, UserV2 } from 'twitter-api-v2';
 import { Config, TwitterError, Tweet, TwitterUser, PostedTweet } from './types.js';
 
 export class TwitterClient {
@@ -53,30 +53,61 @@ export class TwitterClient {
 
       console.error(`Fetched ${response.tweets.length} tweets for query: "${query}"`);
 
-      const tweets = response.tweets.map(tweet => ({
-        id: tweet.id,
-        text: tweet.text,
-        authorId: tweet.author_id ?? '',
-        metrics: {
-          likes: tweet.public_metrics?.like_count ?? 0,
-          retweets: tweet.public_metrics?.retweet_count ?? 0,
-          replies: tweet.public_metrics?.reply_count ?? 0,
-          quotes: tweet.public_metrics?.quote_count ?? 0
-        },
-        createdAt: tweet.created_at ?? ''
-      }));
-
-      const users = response.includes.users.map(user => ({
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        verified: user.verified ?? false
-      }));
+      const tweets = response.tweets.map(tweet => this.mapTweet(tweet));
+      const users = response.includes.users.map(user => this.mapUser(user));
 
       return { tweets, users };
     } catch (error) {
       this.handleApiError(error);
     }
+  }
+
+  async getHomeTimeline(count?: number, startTime?: string): Promise<{ tweets: Tweet[], users: TwitterUser[] }> {
+    try {
+      const endpoint = 'tweets/home_timeline';
+      await this.checkRateLimit(endpoint);
+
+      const response = await this.client.v2.homeTimeline({
+        ...(count !== undefined && { max_results: count }),
+        ...(startTime !== undefined && { start_time: startTime }),
+        expansions: ['author_id'],
+        'tweet.fields': ['public_metrics', 'created_at'],
+        'user.fields': ['username', 'name', 'verified']
+      });
+
+      console.error(`Fetched ${response.tweets.length} tweets from home timeline${startTime ? ` since ${startTime}` : ''}`);
+
+      const tweets = response.tweets.map(tweet => this.mapTweet(tweet));
+      const users = response.includes.users.map(user => this.mapUser(user));
+
+      return { tweets, users };
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  private mapTweet(tweet: TweetV2) {
+    return {
+      id: tweet.id,
+      text: tweet.text,
+      authorId: tweet.author_id ?? '',
+      metrics: {
+        likes: tweet.public_metrics?.like_count ?? 0,
+        retweets: tweet.public_metrics?.retweet_count ?? 0,
+        replies: tweet.public_metrics?.reply_count ?? 0,
+        quotes: tweet.public_metrics?.quote_count ?? 0
+      },
+      createdAt: tweet.created_at ?? ''
+    };
+  }
+
+  private mapUser(user: UserV2) {
+    return {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      verified: user.verified ?? false
+    };
   }
 
   private async checkRateLimit(endpoint: string): Promise<void> {
