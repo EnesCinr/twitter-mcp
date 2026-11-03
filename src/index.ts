@@ -13,7 +13,7 @@ import { TwitterClient } from './twitter-api.js';
 import { ResponseFormatter } from './formatter.js';
 import {
   Config, ConfigSchema,
-  PostTweetSchema, SearchTweetsSchema,
+  PostTweetSchema, SearchTweetsSchema, GetHomeTimelineSchema,
   TwitterError
 } from './types.js';
 import dotenv from 'dotenv';
@@ -107,6 +107,31 @@ export class TwitterServer {
             },
             required: ['query', 'count']
           }
+        } as Tool,
+        {
+          name: 'get_home_timeline',
+          description: 'Get recent tweets from accounts you follow (your home timeline), newest first. Requires a paid X API tier (Basic or higher).',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              count: {
+                type: 'number',
+                description: 'Optional: number of tweets to return (1-100, defaults to the API default of 100)',
+                minimum: 1,
+                maximum: 100
+              },
+              since_days: {
+                type: 'number',
+                description: 'Optional: only return tweets from the last N days (e.g. 1, 3 or 7). Cannot be combined with start_time',
+                exclusiveMinimum: 0,
+                maximum: 30
+              },
+              start_time: {
+                type: 'string',
+                description: 'Optional: only return tweets created after this ISO 8601 UTC timestamp (e.g. 2024-01-01T00:00:00Z). Cannot be combined with since_days'
+              }
+            }
+          }
         } as Tool
       ]
     }));
@@ -122,6 +147,8 @@ export class TwitterServer {
             return await this.handlePostTweet(args);
           case 'search_tweets':
             return await this.handleSearchTweets(args);
+          case 'get_home_timeline':
+            return await this.handleGetHomeTimeline(args);
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -180,6 +207,36 @@ export class TwitterServer {
       content: [{
         type: 'text',
         text: ResponseFormatter.toMcpResponse(formattedResponse)
+      }] as TextContent[]
+    };
+  }
+
+  private async handleGetHomeTimeline(args: unknown) {
+    const result = GetHomeTimelineSchema.safeParse(args ?? {});
+    if (!result.success) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Invalid parameters: ${result.error.message}`
+      );
+    }
+
+    const { count, since_days, start_time } = result.data;
+    const startTime = since_days !== undefined
+      ? new Date(Date.now() - since_days * 24 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')
+      : start_time;
+
+    const { tweets, users } = await this.client.getHomeTimeline(count, startTime);
+
+    const formattedResponse = ResponseFormatter.formatTimelineResponse(
+      tweets,
+      users,
+      startTime
+    );
+
+    return {
+      content: [{
+        type: 'text',
+        text: ResponseFormatter.timelineToMcpResponse(formattedResponse)
       }] as TextContent[]
     };
   }
